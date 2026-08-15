@@ -1,22 +1,15 @@
-import sqlite3
 import datetime
-from config import DB_NAME
-from data_loader import load_activities, load_achievements, evaluate_rule
+import aiosqlite
+from motivation_bot.config import DB_NAME
+from motivation_bot.data_loader import load_activities, load_achievements, evaluate_rule
 
 ACTIVITIES = load_activities()
 ACHIEVEMENTS_LIST = load_achievements()
 
 
-
-def get_connection():
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-def init_db():
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute('''
+async def init_db():
+    async with aiosqlite.connect(DB_NAME) as db:
+        await db.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
                 username TEXT,
@@ -32,7 +25,7 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
-        cursor.execute('''
+        await db.execute('''
             CREATE TABLE IF NOT EXISTS activity_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER,
@@ -44,7 +37,7 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users (user_id)
             )
         ''')
-        cursor.execute('''
+        await db.execute('''
             CREATE TABLE IF NOT EXISTS user_achievements (
                 user_id INTEGER,
                 achievement_id TEXT,
@@ -53,39 +46,43 @@ def init_db():
                 FOREIGN KEY (user_id) REFERENCES users (user_id)
             )
         ''')
-        conn.commit()
+        await db.commit()
 
 
-def register_user(user_id: int, username: str, first_name: str):
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
-        user = cursor.fetchone()
+async def register_user(user_id: int, username: str, first_name: str):
+    async with aiosqlite.connect(DB_NAME) as db:
+        async with db.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            user = await cursor.fetchone()
+
         if not user:
-            cursor.execute(
+            await db.execute(
                 "INSERT INTO users (user_id, username, first_name) VALUES (?, ?, ?)",
                 (user_id, username or "", first_name or "Пользователь")
             )
         else:
-            cursor.execute(
+            await db.execute(
                 "UPDATE users SET username = ?, first_name = ? WHERE user_id = ?",
                 (username or "", first_name or "Пользователь", user_id)
             )
-        conn.commit()
+        await db.commit()
 
-def get_user(user_id: int):
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-        return cursor.fetchone()
 
-def update_streak(conn, user_id: int):
+async def get_user(user_id: int):
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            row = await cursor.fetchone()
+            return dict(row) if row else None
+
+
+async def update_streak(db, user_id: int):
     today = datetime.date.today().isoformat()
     yesterday = (datetime.date.today() - datetime.timedelta(days=1)).isoformat()
 
-    cursor = conn.cursor()
-    cursor.execute("SELECT last_active_date, streak_days FROM users WHERE user_id = ?", (user_id,))
-    row = cursor.fetchone()
+    db.row_factory = aiosqlite.Row
+    async with db.execute("SELECT last_active_date, streak_days FROM users WHERE user_id = ?", (user_id,)) as cursor:
+        row = await cursor.fetchone()
+
     if not row:
         return 1
 
@@ -99,10 +96,11 @@ def update_streak(conn, user_id: int):
     else:
         new_streak = 1
 
-    cursor.execute("UPDATE users SET streak_days = ?, last_active_date = ? WHERE user_id = ?", (new_streak, today, user_id))
+    await db.execute("UPDATE users SET streak_days = ?, last_active_date = ? WHERE user_id = ?", (new_streak, today, user_id))
     return new_streak
 
-def add_activity(user_id: int, activity_key: str, quantity: float = None):
+
+async def add_activity(user_id: int, activity_key: str, quantity: float = None):
     if activity_key not in ACTIVITIES:
         return None
 
@@ -119,24 +117,23 @@ def add_activity(user_id: int, activity_key: str, quantity: float = None):
     qty_str = f"{qty_val_str} {unit}"
     log_title = f"{act_info['title']} ({qty_str})"
 
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        streak = update_streak(conn, user_id)
+    async with aiosqlite.connect(DB_NAME) as db:
+        streak = await update_streak(db, user_id)
 
-        cursor.execute(f"""
+        await db.execute(f"""
             UPDATE users
             SET {stat_field} = {stat_field} + ?,
                 total_xp = total_xp + ?
             WHERE user_id = ?
         """, (reward, reward, user_id))
 
-        cursor.execute("""
+        await db.execute("""
             INSERT INTO activity_logs (user_id, activity_key, activity_title, stat_name, stat_gained)
             VALUES (?, ?, ?, ?, ?)
         """, (user_id, activity_key, log_title, act_info['stat_title'], reward))
 
-        conn.commit()
-        new_achievements = check_achievements(conn, user_id)
+        await db.commit()
+        new_achievements = await check_achievements(db, user_id)
 
     return {
         "activity": act_info,
@@ -147,32 +144,35 @@ def add_activity(user_id: int, activity_key: str, quantity: float = None):
     }
 
 
-def check_achievements(conn, user_id: int):
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM users WHERE user_id = ?", (user_id,))
-    user_row = cursor.fetchone()
+async def check_achievements(db, user_id: int):
+    db.row_factory = aiosqlite.Row
+    async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor:
+        user_row = await cursor.fetchone()
     if not user_row:
         return []
 
     stats = dict(user_row)
 
-    cursor.execute("SELECT COUNT(*) as cnt FROM activity_logs WHERE user_id = ?", (user_id,))
-    activity_count = cursor.fetchone()['cnt']
+    async with db.execute("SELECT COUNT(*) as cnt FROM activity_logs WHERE user_id = ?", (user_id,)) as cursor:
+        row = await cursor.fetchone()
+        activity_count = row['cnt']
 
     today = datetime.date.today().isoformat()
-    cursor.execute(
+    async with db.execute(
         "SELECT COUNT(*) as cnt FROM activity_logs WHERE user_id = ? AND date(timestamp) = ?",
         (user_id, today)
-    )
-    today_count = cursor.fetchone()['cnt']
+    ) as cursor:
+        row = await cursor.fetchone()
+        today_count = row['cnt']
 
     current_hour = datetime.datetime.now().hour
 
-    cursor.execute(
+    async with db.execute(
         "SELECT activity_key, COUNT(*) as cnt FROM activity_logs WHERE user_id = ? GROUP BY activity_key",
         (user_id,)
-    )
-    act_counts = {r['activity_key']: r['cnt'] for r in cursor.fetchall()}
+    ) as cursor:
+        rows = await cursor.fetchall()
+        act_counts = {r['activity_key']: r['cnt'] for r in rows}
 
     ctx = {
         "stats": stats,
@@ -182,27 +182,30 @@ def check_achievements(conn, user_id: int):
         "act_counts": act_counts
     }
 
-    cursor.execute("SELECT achievement_id FROM user_achievements WHERE user_id = ?", (user_id,))
-    unlocked = {r['achievement_id'] for r in cursor.fetchall()}
+    async with db.execute("SELECT achievement_id FROM user_achievements WHERE user_id = ?", (user_id,)) as cursor:
+        unlocked_rows = await cursor.fetchall()
+        unlocked = {r['achievement_id'] for r in unlocked_rows}
 
     newly_unlocked = []
     for ach in ACHIEVEMENTS_LIST:
         if ach['id'] not in unlocked:
             if evaluate_rule(ach.get('rule', {}), ctx):
-                cursor.execute(
+                await db.execute(
                     "INSERT INTO user_achievements (user_id, achievement_id) VALUES (?, ?)",
                     (user_id, ach['id'])
                 )
                 newly_unlocked.append(ach)
 
+    await db.commit()
     return newly_unlocked
 
 
-def get_user_achievements(user_id: int):
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT achievement_id, unlocked_at FROM user_achievements WHERE user_id = ?", (user_id,))
-        unlocked = {r['achievement_id']: r['unlocked_at'] for r in cursor.fetchall()}
+async def get_user_achievements(user_id: int):
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT achievement_id, unlocked_at FROM user_achievements WHERE user_id = ?", (user_id,)) as cursor:
+            rows = await cursor.fetchall()
+            unlocked = {r['achievement_id']: r['unlocked_at'] for r in rows}
 
     result = []
     for ach in ACHIEVEMENTS_LIST:
@@ -231,7 +234,7 @@ def get_user_achievements(user_id: int):
     return result
 
 
-def get_leaderboard(stat_type: str = "total_xp", limit: int = 10):
+async def get_leaderboard(stat_type: str = "total_xp", limit: int = 10):
     valid_stats = {
         "total_xp": "Общий опыт",
         "strength": "Сила",
@@ -242,26 +245,29 @@ def get_leaderboard(stat_type: str = "total_xp", limit: int = 10):
 
     stat_col = stat_type if stat_type in valid_stats else "total_xp"
 
-    with get_connection() as conn:
-        cursor = conn.cursor()
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
         query = f"""
             SELECT user_id, username, first_name, {stat_col} as score, total_xp, strength, intelligence, agility, wisdom
             FROM users
             ORDER BY {stat_col} DESC, total_xp DESC
             LIMIT ?
         """
-        cursor.execute(query, (limit,))
-        return cursor.fetchall(), valid_stats.get(stat_col, "Общий опыт")
+        async with db.execute(query, (limit,)) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows], valid_stats.get(stat_col, "Общий опыт")
 
-def get_user_activity_history(user_id: int, limit: int = 5):
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
+
+async def get_user_activity_history(user_id: int, limit: int = 5):
+    async with aiosqlite.connect(DB_NAME) as db:
+        db.row_factory = aiosqlite.Row
+        query = """
             SELECT activity_title, stat_name, stat_gained, timestamp
             FROM activity_logs
             WHERE user_id = ?
             ORDER BY timestamp DESC
             LIMIT ?
-        """, (user_id, limit))
-        return cursor.fetchall()
-
+        """
+        async with db.execute(query, (user_id, limit)) as cursor:
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]

@@ -1,28 +1,28 @@
 import json
-import os
+from pathlib import Path
 
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
+PACKAGE_DIR = Path(__file__).parent
+DATA_DIR = PACKAGE_DIR / "data"
 
 
-def load_activities():
-    path = os.path.join(DATA_DIR, "activities.json")
+def load_activities() -> dict:
+    path = DATA_DIR / "activities.json"
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
-    # Привязываем динамический расчет очков
     for key, act in data.items():
         rate = act.get("rate", 1.0)
         act["calc_pts"] = lambda q, r=rate: max(1, round(q * r))
     return data
 
 
-def load_achievements():
-    path = os.path.join(DATA_DIR, "achievements.json")
+def load_achievements() -> list:
+    path = DATA_DIR / "achievements.json"
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def load_ranks():
-    path = os.path.join(DATA_DIR, "ranks.json")
+def load_ranks() -> list:
+    path = DATA_DIR / "ranks.json"
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 

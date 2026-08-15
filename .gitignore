@@ -1,5 +1,14 @@
 .env
 motivation_bot.db
 *.db
+*.sqlite
+*.sqlite3
+
 __pycache__/
 *.pyc
+.pytest_cache/
+
+dist/
+build/
+*.egg-info/
+

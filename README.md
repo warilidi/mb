@@ -35,29 +35,36 @@ Telegram-бот для трекинга полезных привычек и с�
 
 ## Установка и запуск
 
-1. Установите зависимости:
+1. Установите пакет в режиме разработки:
    ```bash
-   pip install -r requirements.txt
+   pip install -e .
    ```
 
-2. Укажите токен бота в файле `.env`:
+2. Создайте файл `.env` и укажите токен бота:
    ```env
    BOT_TOKEN=ВАШ_ТОКЕН_ОТ_BOTFATHER
    DB_NAME=motivation_bot.db
    ```
 
-3. Запустите бота:
+3. Запустите бота одним из способов:
    ```bash
-   python main.py
+   python -m motivation_bot
+   # или
+   motivation-bot
    ```
 
 ---
 
-## Структура проекта
+## Структура проекта (`src`-layout)
 
-- `main.py` — Инициализация Telegram-приложения и обработка событий.
-- `database.py` — Модель данных SQLite (пользователи, логи, достижения).
-- `handlers.py` — Обработчики команд и callback-запросов.
-- `keyboards.py` — Генерация инлайн и реплай клавиатур.
-- `config.py` — Настройки окружения.
+- `pyproject.toml` — Спецификация пакета Python (PEP 621).
+- `src/motivation_bot/`
+  - `__main__.py` — Точка входа для запуска модуля `python -m motivation_bot`.
+  - `bot.py` — Инициализация `aiogram 3` Dispatcher и Polling.
+  - `database.py` — Асинхронное взаимодействие с SQLite через `aiosqlite`.
+  - `handlers.py` — Routers, обработчики команд и FSM-состояний.
+  - `keyboards.py` — Генерация Reply и Inline клавиатур.
+  - `data_loader.py` — Загрузка конфигураций и проверка правил достижений.
+  - `data/` — Внешние JSON-конфигурации (`activities.json`, `achievements.json`, `ranks.json`).
+
 
