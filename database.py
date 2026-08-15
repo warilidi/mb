@@ -1,236 +1,11 @@
 import sqlite3
 import datetime
 from config import DB_NAME
+from data_loader import load_activities, load_achievements, evaluate_rule
 
-ACTIVITIES = {
-    "workout": {
-        "title": "🏋️ Тренировка",
-        "stat": "strength",
-        "stat_title": "Сила",
-        "unit": "мин",
-        "prompt": "Укажите длительность тренировки в минутах (например: 35):",
-        "presets": [(15, "15 мин"), (30, "30 мин"), (45, "45 мин"), (60, "60 мин")],
-        "calc_pts": lambda q: max(1, round(q * 0.35)),
-        "emoji": "💪"
-    },
-    "reading": {
-        "title": "📚 Чтение книги",
-        "stat": "intelligence",
-        "stat_title": "Интеллект",
-        "unit": "стр",
-        "prompt": "Укажите количество прочитанных страниц (например: 25):",
-        "presets": [(10, "10 стр"), (20, "20 стр"), (30, "30 стр"), (50, "50 стр")],
-        "calc_pts": lambda q: max(1, round(q * 0.5)),
-        "emoji": "🧠"
-    },
-    "running": {
-        "title": "🏃 Пробежка",
-        "stat": "agility",
-        "stat_title": "Ловкость",
-        "unit": "км",
-        "prompt": "Укажите дистанцию пробежки в километрах (например: 4.5):",
-        "presets": [(3, "3 км"), (5, "5 км"), (8, "8 км"), (10, "10 км")],
-        "calc_pts": lambda q: max(1, round(q * 3.0)),
-        "emoji": "⚡"
-    },
-    "meditation": {
-        "title": "🧘 Медитация",
-        "stat": "wisdom",
-        "stat_title": "Мудрость",
-        "unit": "мин",
-        "prompt": "Укажите время медитации в минутах (например: 15):",
-        "presets": [(10, "10 мин"), (15, "15 мин"), (20, "20 мин"), (30, "30 мин")],
-        "calc_pts": lambda q: max(1, round(q * 0.5)),
-        "emoji": "🔮"
-    },
-    "language": {
-        "title": "🗣 Изучение языка",
-        "stat": "intelligence",
-        "stat_title": "Интеллект",
-        "unit": "мин",
-        "prompt": "Укажите время изучения языка в минутах (например: 25):",
-        "presets": [(15, "15 мин"), (30, "30 мин"), (45, "45 мин"), (60, "60 мин")],
-        "calc_pts": lambda q: max(1, round(q * 0.4)),
-        "emoji": "🌐"
-    },
-    "water": {
-        "title": "💧 Питьевой режим",
-        "stat": "health",
-        "stat_title": "Здоровье",
-        "unit": "л",
-        "prompt": "Укажите выпитый объём воды в литрах (например: 1.5):",
-        "presets": [(1.0, "1 л"), (1.5, "1.5 л"), (2.0, "2 л"), (2.5, "2.5 л")],
-        "calc_pts": lambda q: max(1, round(q * 2.0)),
-        "emoji": "❤️"
-    },
-    "sleep": {
-        "title": "🛌 Полноценный сон",
-        "stat": "health",
-        "stat_title": "Здоровье",
-        "unit": "ч",
-        "prompt": "Укажите длительность сна в часах (например: 8):",
-        "presets": [(6, "6 ч"), (7, "7 ч"), (8, "8 ч"), (9, "9 ч")],
-        "calc_pts": lambda q: max(1, round(q * 0.7)),
-        "emoji": "💤"
-    }
-}
+ACTIVITIES = load_activities()
+ACHIEVEMENTS_LIST = load_achievements()
 
-
-ACHIEVEMENTS_LIST = [
-    {
-        "id": "first_step",
-        "title": "🚀 Первый шаг",
-        "desc": "Завершите вашу первую активность",
-        "secret": False,
-        "check": lambda ctx: ctx["count"] >= 1
-    },
-    {
-        "id": "workout_beginner",
-        "title": "🏋️ Начинающий атлет",
-        "desc": "Получите 25+ очков Силы",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["strength"] >= 25
-    },
-    {
-        "id": "workout_master",
-        "title": "💪 Стальной мускул",
-        "desc": "Получите 100+ очков Силы",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["strength"] >= 100
-    },
-    {
-        "id": "bookworm",
-        "title": "📚 Книжный червь",
-        "desc": "Получите 50+ очков Интеллекта",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["intelligence"] >= 50
-    },
-    {
-        "id": "erudite",
-        "title": "🧠 Ходячая энциклопедия",
-        "desc": "Получите 150+ очков Интеллекта",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["intelligence"] >= 150
-    },
-    {
-        "id": "runner",
-        "title": "⚡ Молния",
-        "desc": "Получите 30+ очков Ловкости",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["agility"] >= 30
-    },
-    {
-        "id": "marathoner",
-        "title": "🏃 Марафонщик",
-        "desc": "Получите 100+ очков Ловкости",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["agility"] >= 100
-    },
-    {
-        "id": "zen_master",
-        "title": "🧘 Дзен-Мастер",
-        "desc": "Получите 25+ очков Мудрости",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["wisdom"] >= 25
-    },
-    {
-        "id": "oracle",
-        "title": "🔮 Оракул",
-        "desc": "Получите 100+ очков Мудрости",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["wisdom"] >= 100
-    },
-    {
-        "id": "water_master",
-        "title": "💧 Баланс гидратации",
-        "desc": "Выполните норму питья воды 5 раз",
-        "secret": False,
-        "check": lambda ctx: ctx["act_counts"].get("water", 0) >= 5
-    },
-    {
-        "id": "polyglot",
-        "title": "🌐 Полиглот",
-        "desc": "Завершите 10 уроков иностранного языка",
-        "secret": False,
-        "check": lambda ctx: ctx["act_counts"].get("language", 0) >= 10
-    },
-    {
-        "id": "streak_3",
-        "title": "🔥 Старт дисциплины",
-        "desc": "Поддерживайте активность 3 дня подряд",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["streak_days"] >= 3
-    },
-    {
-        "id": "streak_7",
-        "title": "⚡ Непреклонный",
-        "desc": "Поддерживайте активность 7 дней подряд",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["streak_days"] >= 7
-    },
-    {
-        "id": "streak_30",
-        "title": "👑 Железная воля",
-        "desc": "Поддерживайте активность 30 дней подряд",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["streak_days"] >= 30
-    },
-    {
-        "id": "level_5",
-        "title": "⭐ Восходящая звезда",
-        "desc": "Достигните 5-го уровня (200+ XP)",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["total_xp"] >= 200
-    },
-    {
-        "id": "level_10",
-        "title": "🌟 Мастер привычек",
-        "desc": "Достигните 10-го уровня (450+ XP)",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["total_xp"] >= 450
-    },
-    {
-        "id": "hero_1000",
-        "title": "🏆 Легендарный герой",
-        "desc": "Наберите 1000+ XP",
-        "secret": False,
-        "check": lambda ctx: ctx["stats"]["total_xp"] >= 1000
-    },
-    {
-        "id": "night_owl",
-        "title": "🦉 Ночная сова",
-        "desc": "Зафиксируйте активность глубокой ночью (00:00 - 05:00)",
-        "secret": True,
-        "check": lambda ctx: 0 <= ctx["hour"] < 5
-    },
-    {
-        "id": "early_bird",
-        "title": "🌅 Ранняя пташка",
-        "desc": "Зафиксируйте активность ранним утром (05:00 - 07:00)",
-        "secret": True,
-        "check": lambda ctx: 5 <= ctx["hour"] < 7
-    },
-    {
-        "id": "harmony",
-        "title": "🎯 Гармония стихий",
-        "desc": "Прокачайте ВСЕ характеристики минимум до 20 очков",
-        "secret": True,
-        "check": lambda ctx: (
-            ctx["stats"]["strength"] >= 20 and
-            ctx["stats"]["intelligence"] >= 20 and
-            ctx["stats"]["agility"] >= 20 and
-            ctx["stats"]["wisdom"] >= 20 and
-            ctx["stats"]["health"] >= 20
-        )
-    },
-    {
-        "id": "hyperactive",
-        "title": "🚀 Гиперактивность",
-        "desc": "Выполните 5 или более активностей за один день",
-        "secret": True,
-        "check": lambda ctx: ctx["today_count"] >= 5
-    }
-]
 
 
 def get_connection():
@@ -413,7 +188,7 @@ def check_achievements(conn, user_id: int):
     newly_unlocked = []
     for ach in ACHIEVEMENTS_LIST:
         if ach['id'] not in unlocked:
-            if ach['check'](ctx):
+            if evaluate_rule(ach.get('rule', {}), ctx):
                 cursor.execute(
                     "INSERT INTO user_achievements (user_id, achievement_id) VALUES (?, ?)",
                     (user_id, ach['id'])
@@ -421,6 +196,7 @@ def check_achievements(conn, user_id: int):
                 newly_unlocked.append(ach)
 
     return newly_unlocked
+
 
 def get_user_achievements(user_id: int):
     with get_connection() as conn:

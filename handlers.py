@@ -3,22 +3,17 @@ from telegram import Update
 from telegram.ext import ContextTypes
 import database as db
 import keyboards as kb
+from data_loader import load_ranks
+
+RANKS_LIST = load_ranks()
 
 
 def get_rank_title(level: int) -> str:
-    ranks = [
-        (3, "Новичок"),
-        (6, "Ученик"),
-        (10, "Искатель"),
-        (15, "Практик"),
-        (20, "Знаток"),
-        (30, "Мастер"),
-        (50, "Грандмастер"),
-    ]
-    for max_lvl, title in ranks:
-        if level < max_lvl:
-            return title
+    for rank_item in RANKS_LIST:
+        if level < rank_item["max_lvl"]:
+            return rank_item["title"]
     return "Легенда"
+
 
 
 def make_progress_bar(xp_in_level: int, max_xp: int = 50, length: int = 10) -> str:

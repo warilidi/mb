@@ -1,0 +1,149 @@
+[
+  {
+    "id": "first_step",
+    "title": "🚀 Первый шаг",
+    "desc": "Завершите вашу первую активность",
+    "secret": false,
+    "rule": { "type": "total_activities_min", "val": 1 }
+  },
+  {
+    "id": "workout_beginner",
+    "title": "🏋️ Начинающий атлет",
+    "desc": "Получите 25+ очков Силы",
+    "secret": false,
+    "rule": { "type": "stat_min", "stat": "strength", "val": 25 }
+  },
+  {
+    "id": "workout_master",
+    "title": "💪 Стальной мускул",
+    "desc": "Получите 100+ очков Силы",
+    "secret": false,
+    "rule": { "type": "stat_min", "stat": "strength", "val": 100 }
+  },
+  {
+    "id": "bookworm",
+    "title": "📚 Книжный червь",
+    "desc": "Получите 50+ очков Интеллекта",
+    "secret": false,
+    "rule": { "type": "stat_min", "stat": "intelligence", "val": 50 }
+  },
+  {
+    "id": "erudite",
+    "title": "🧠 Ходячая энциклопедия",
+    "desc": "Получите 150+ очков Интеллекта",
+    "secret": false,
+    "rule": { "type": "stat_min", "stat": "intelligence", "val": 150 }
+  },
+  {
+    "id": "runner",
+    "title": "⚡ Молния",
+    "desc": "Получите 30+ очков Ловкости",
+    "secret": false,
+    "rule": { "type": "stat_min", "stat": "agility", "val": 30 }
+  },
+  {
+    "id": "marathoner",
+    "title": "🏃 Марафонщик",
+    "desc": "Получите 100+ очков Ловкости",
+    "secret": false,
+    "rule": { "type": "stat_min", "stat": "agility", "val": 100 }
+  },
+  {
+    "id": "zen_master",
+    "title": "🧘 Дзен-Мастер",
+    "desc": "Получите 25+ очков Мудрости",
+    "secret": false,
+    "rule": { "type": "stat_min", "stat": "wisdom", "val": 25 }
+  },
+  {
+    "id": "oracle",
+    "title": "🔮 Оракул",
+    "desc": "Получите 100+ очков Мудрости",
+    "secret": false,
+    "rule": { "type": "stat_min", "stat": "wisdom", "val": 100 }
+  },
+  {
+    "id": "water_master",
+    "title": "💧 Баланс гидратации",
+    "desc": "Выполните норму питья воды 5 раз",
+    "secret": false,
+    "rule": { "type": "act_count_min", "act": "water", "val": 5 }
+  },
+  {
+    "id": "polyglot",
+    "title": "🌐 Полиглот",
+    "desc": "Завершите 10 уроков иностранного языка",
+    "secret": false,
+    "rule": { "type": "act_count_min", "act": "language", "val": 10 }
+  },
+  {
+    "id": "streak_3",
+    "title": "🔥 Старт дисциплины",
+    "desc": "Поддерживайте активность 3 дня подряд",
+    "secret": false,
+    "rule": { "type": "streak_min", "val": 3 }
+  },
+  {
+    "id": "streak_7",
+    "title": "⚡ Непреклонный",
+    "desc": "Поддерживайте активность 7 дней подряд",
+    "secret": false,
+    "rule": { "type": "streak_min", "val": 7 }
+  },
+  {
+    "id": "streak_30",
+    "title": "👑 Железная воля",
+    "desc": "Поддерживайте активность 30 дней подряд",
+    "secret": false,
+    "rule": { "type": "streak_min", "val": 30 }
+  },
+  {
+    "id": "level_5",
+    "title": "⭐ Восходящая звезда",
+    "desc": "Достигните 5-го уровня (200+ XP)",
+    "secret": false,
+    "rule": { "type": "total_xp_min", "val": 200 }
+  },
+  {
+    "id": "level_10",
+    "title": "🌟 Мастер привычек",
+    "desc": "Достигните 10-го уровня (450+ XP)",
+    "secret": false,
+    "rule": { "type": "total_xp_min", "val": 450 }
+  },
+  {
+    "id": "hero_1000",
+    "title": "🏆 Легендарный герой",
+    "desc": "Наберите 1000+ XP",
+    "secret": false,
+    "rule": { "type": "total_xp_min", "val": 1000 }
+  },
+  {
+    "id": "night_owl",
+    "title": "🦉 Ночная сова",
+    "desc": "Зафиксируйте активность глубокой ночью (00:00 - 05:00)",
+    "secret": true,
+    "rule": { "type": "hour_range", "min_hour": 0, "max_hour": 5 }
+  },
+  {
+    "id": "early_bird",
+    "title": "🌅 Ранняя пташка",
+    "desc": "Зафиксируйте активность ранним утром (05:00 - 07:00)",
+    "secret": true,
+    "rule": { "type": "hour_range", "min_hour": 5, "max_hour": 7 }
+  },
+  {
+    "id": "harmony",
+    "title": "🎯 Гармония стихий",
+    "desc": "Прокачайте ВСЕ характеристики минимум до 20 очков",
+    "secret": true,
+    "rule": { "type": "all_stats_min", "val": 20 }
+  },
+  {
+    "id": "hyperactive",
+    "title": "🚀 Гиперактивность",
+    "desc": "Выполните 5 или более активностей за один день",
+    "secret": true,
+    "rule": { "type": "today_activities_min", "val": 5 }
+  }
+]

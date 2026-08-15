@@ -1,0 +1,10 @@
+[
+  { "max_lvl": 3, "title": "Новичок" },
+  { "max_lvl": 6, "title": "Ученик" },
+  { "max_lvl": 10, "title": "Искатель" },
+  { "max_lvl": 15, "title": "Практик" },
+  { "max_lvl": 20, "title": "Знаток" },
+  { "max_lvl": 30, "title": "Мастер" },
+  { "max_lvl": 50, "title": "Грандмастер" },
+  { "max_lvl": 9999, "title": "Легенда" }
+]
