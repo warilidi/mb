@@ -8,6 +8,7 @@ import motivation_bot.database as db
 import motivation_bot.keyboards as kb
 from motivation_bot.data_loader import load_ranks
 from motivation_bot.states import ActivityForm
+from motivation_bot.i18n import t
 
 router = Router()
 RANKS_LIST = load_ranks()
@@ -33,19 +34,7 @@ async def start_cmd(message: Message, state: FSMContext):
     user = message.from_user
     await db.register_user(user.id, user.username, user.first_name)
 
-    text = (
-        f"Привет, {user.first_name}.\n\n"
-        f"Бот помогает превратить полезные привычки в систему прокачки персонажа.\n\n"
-        f"**Начисление очков зависит от объема/времени:**\n"
-        f"• 🏋️ Тренировка: **~0.35 очка/мин** (Сила)\n"
-        f"• 📚 Чтение книги: **~0.5 очка/стр** (Интеллект)\n"
-        f"• 🏃 Пробежка: **~3.0 очка/км** (Ловкость)\n"
-        f"• 🧘 Медитация: **~0.5 очка/мин** (Мудрость)\n"
-        f"• 🗣 Изучение языка: **~0.4 очка/мин** (Интеллект)\n"
-        f"• 💧 Питьевой режим: **2.0 очка/литр** (Здоровье)\n"
-        f"• 🛌 Полноценный сон: **~0.7 очка/час** (Здоровье)\n\n"
-        f"Записывай активность, указывай объем, поднимай уровень и соревнуйся в лидерборде."
-    )
+    text = t("welcome", first_name=user.first_name)
 
     await message.answer(
         text,
@@ -63,7 +52,7 @@ async def profile_cmd(message: Message, state: FSMContext):
     user_data = await db.get_user(user.id)
 
     if not user_data:
-        await message.answer("Профиль не найден. Введите /start")
+        await message.answer(t("profile_not_found"))
         return
 
     total_xp = user_data["total_xp"]
@@ -73,18 +62,20 @@ async def profile_cmd(message: Message, state: FSMContext):
     rank = get_rank_title(level)
     streak = user_data["streak_days"] or 0
 
-    profile_text = (
-        f"👤 **Профиль: {user_data['first_name']}**\n"
-        f"Звание: **{rank}** | Уровень: **{level}**\n"
-        f"Прогресс: {progress_bar} ({xp_in_level}/50 XP)\n"
-        f"Серия дней подряд: 🔥 **{streak}**\n\n"
-        f"**Характеристики:**\n"
-        f"💪 Сила: **{user_data['strength']}**\n"
-        f"🧠 Интеллект: **{user_data['intelligence']}**\n"
-        f"⚡ Ловкость: **{user_data['agility']}**\n"
-        f"🔮 Мудрость: **{user_data['wisdom']}**\n"
-        f"❤️ Здоровье: **{user_data['health']}**\n\n"
-        f"Суммарный опыт: **{total_xp} XP**"
+    profile_text = t(
+        "profile",
+        first_name=user_data["first_name"],
+        rank=rank,
+        level=level,
+        progress_bar=progress_bar,
+        xp_in_level=xp_in_level,
+        streak=streak,
+        strength=user_data["strength"],
+        intelligence=user_data["intelligence"],
+        agility=user_data["agility"],
+        wisdom=user_data["wisdom"],
+        health=user_data["health"],
+        total_xp=total_xp,
     )
 
     await message.answer(profile_text, parse_mode="Markdown")
@@ -95,7 +86,7 @@ async def profile_cmd(message: Message, state: FSMContext):
 async def log_activity_cmd(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "Выберите активность для записи:",
+        t("select_activity"),
         reply_markup=kb.get_activities_keyboard(),
     )
 
@@ -104,7 +95,7 @@ async def log_activity_cmd(message: Message, state: FSMContext):
 async def cancel_action_cb(query: CallbackQuery, state: FSMContext):
     await state.clear()
     await query.answer()
-    await query.message.edit_text("Отменено.")
+    await query.message.edit_text(t("action_cancelled"))
 
 
 @router.callback_query(F.data == "act_back")
@@ -112,7 +103,7 @@ async def act_back_cb(query: CallbackQuery, state: FSMContext):
     await state.clear()
     await query.answer()
     await query.message.edit_text(
-        "Выберите активность для записи:",
+        t("select_activity"),
         reply_markup=kb.get_activities_keyboard(),
     )
 
@@ -126,7 +117,7 @@ async def act_select_cb(query: CallbackQuery, state: FSMContext):
     if act_key in db.ACTIVITIES:
         act = db.ACTIVITIES[act_key]
         await query.message.edit_text(
-            f"{act['emoji']} **{act['title']}**\n{act['prompt']}",
+            t("activity_prompt", emoji=act["emoji"], title=act["title"], prompt=act["prompt"]),
             parse_mode="Markdown",
             reply_markup=kb.get_activity_quantity_keyboard(act_key),
         )
@@ -142,7 +133,7 @@ async def act_custom_cb(query: CallbackQuery, state: FSMContext):
         await state.set_state(ActivityForm.waiting_for_quantity)
         await state.update_data(pending_act=act_key)
         await query.message.edit_text(
-            f"{act['emoji']} **{act['title']}**\n\n💬 {act['prompt']}\n\n_Отправьте число сообщением в чат._",
+            t("custom_activity_prompt", emoji=act["emoji"], title=act["title"], prompt=act["prompt"]),
             parse_mode="Markdown",
         )
 
@@ -165,19 +156,22 @@ async def act_preset_cb(query: CallbackQuery, state: FSMContext):
             return
 
         act = res["activity"]
-        msg = (
-            f"Засчитано: **{act['title']} ({res['quantity_str']})**\n"
-            f"Начислено: **+{res['gained']} к {act['stat_title']}**\n"
-            f"Серия дней подряд: **{res['streak']}**"
+        msg = t(
+            "activity_recorded",
+            title=act["title"],
+            quantity_str=res["quantity_str"],
+            gained=res["gained"],
+            stat_title=act["stat_title"],
+            streak=res["streak"],
         )
 
         if res["new_achievements"]:
-            msg += "\n\n🏆 **Разблокировано новое достижение!**"
+            msg += t("new_achievements_header")
             for ach in res["new_achievements"]:
                 if ach.get("secret"):
-                    msg += f"\n- 🕵️ **Секретное достижение:** {ach['title']} — _{ach['desc']}_"
+                    msg += t("achievement_secret_item", title=ach["title"], desc=ach["desc"])
                 else:
-                    msg += f"\n- **{ach['title']}**: _{ach['desc']}_"
+                    msg += t("achievement_unlocked_item", title=ach["title"], desc=ach["desc"])
 
         await query.message.edit_text(msg, parse_mode="Markdown")
 
@@ -194,7 +188,7 @@ async def text_quantity_input(message: Message, state: FSMContext):
             if val <= 0:
                 raise ValueError()
         except ValueError:
-            await message.answer("Пожалуйста, введите положительное число (например: 30 или 1.5).")
+            await message.answer(t("invalid_number_input"))
             return
 
         user = message.from_user
@@ -207,19 +201,22 @@ async def text_quantity_input(message: Message, state: FSMContext):
             return
 
         act = res["activity"]
-        msg = (
-            f"Засчитано: **{act['title']} ({res['quantity_str']})**\n"
-            f"Начислено: **+{res['gained']} к {act['stat_title']}**\n"
-            f"Серия дней подряд: **{res['streak']}**"
+        msg = t(
+            "activity_recorded",
+            title=act["title"],
+            quantity_str=res["quantity_str"],
+            gained=res["gained"],
+            stat_title=act["stat_title"],
+            streak=res["streak"],
         )
 
         if res["new_achievements"]:
-            msg += "\n\n🏆 **Разблокировано новое достижение!**"
+            msg += t("new_achievements_header")
             for ach in res["new_achievements"]:
                 if ach.get("secret"):
-                    msg += f"\n- 🕵️ **Секретное достижение:** {ach['title']} — _{ach['desc']}_"
+                    msg += t("achievement_secret_item", title=ach["title"], desc=ach["desc"])
                 else:
-                    msg += f"\n- **{ach['title']}**: _{ach['desc']}_"
+                    msg += t("achievement_unlocked_item", title=ach["title"], desc=ach["desc"])
 
         await message.answer(msg, parse_mode="Markdown", reply_markup=kb.get_main_keyboard())
 
@@ -240,15 +237,15 @@ async def leaderboard_cb(query: CallbackQuery):
 
 async def render_leaderboard(event, stat_type: str, is_callback: bool):
     rows, stat_title = await db.get_leaderboard(stat_type, limit=10)
-    leaderboard_text = f"🏆 **Таблица лидеров — {stat_title}**\n\n"
+    leaderboard_text = t("leaderboard_header", stat_title=stat_title)
 
     if not rows:
-        leaderboard_text += "В этой категории пока нет записей."
+        leaderboard_text += t("leaderboard_empty")
     else:
         for idx, row in enumerate(rows, 1):
             name = row["first_name"] or row["username"] or f"ID {row['user_id']}"
             score = row["score"]
-            leaderboard_text += f"{idx}. **{name}** — `{score}` pts\n"
+            leaderboard_text += t("leaderboard_row", idx=idx, name=name, score=score)
 
     if is_callback:
         await event.message.edit_text(
@@ -274,7 +271,7 @@ async def achievements_cmd(message: Message, state: FSMContext):
     achievements = await db.get_user_achievements(user.id)
     unlocked_cnt = sum(1 for a in achievements if a["unlocked"])
 
-    text = f"🏅 **Достижения ({unlocked_cnt}/{len(achievements)}):**\n\n"
+    text = t("achievements_header", unlocked_cnt=unlocked_cnt, total_cnt=len(achievements))
     for ach in achievements:
         status = "✅" if ach["unlocked"] else "🔒"
         text += f"{status} **{ach['title']}**\n   _{ach['desc']}_\n\n"
@@ -292,12 +289,12 @@ async def history_cmd(message: Message, state: FSMContext):
     logs = await db.get_user_activity_history(user.id, limit=8)
 
     if not logs:
-        text = "История активностей пока пуста."
+        text = t("history_empty")
     else:
-        text = "📜 **Последние записи:**\n\n"
+        text = t("history_header")
         for log in logs:
             dt = log["timestamp"][:16] if log["timestamp"] else ""
-            text += f"• **{log['activity_title']}** (+{log['stat_gained']} {log['stat_name']}) — _{dt}_\n"
+            text += t("history_item", title=log["activity_title"], gained=log["stat_gained"], stat_name=log["stat_name"], dt=dt)
 
     await message.answer(text, parse_mode="Markdown")
 
@@ -306,20 +303,5 @@ async def history_cmd(message: Message, state: FSMContext):
 @router.message(F.text == "❓ Помощь")
 async def help_cmd(message: Message, state: FSMContext):
     await state.clear()
-    help_text = (
-        "ℹ️ **Справка по работе с ботом**\n\n"
-        "Каждое выполненное целевое действие развивает характеристики профиля.\n\n"
-        "**Система начислений:**\n"
-        "• 🏋️ **Тренировка:** ~0.35 очка/мин\n"
-        "• 📚 **Чтение книги:** ~0.5 очка/стр\n"
-        "• 🏃 **Пробежка:** ~3.0 очка/км\n"
-        "• 🧘 **Медитация:** ~0.5 очка/мин\n"
-        "• 🗣 **Изучение языка:** ~0.4 очка/мин\n"
-        "• 💧 **Питьевой режим:** 2.0 очка/литр\n"
-        "• 🛌 **Полноценный сон:** ~0.7 очка/час\n\n"
-        "**Опыт и уровни:**\n"
-        "Каждые 50 XP повышают уровень персонажа и обновляют звание.\n\n"
-        "**Серия (Streak):**\n"
-        "Фиксируйте хотя бы одно действие каждый день, чтобы поддерживать счетчик дней."
-    )
-    await message.answer(help_text, parse_mode="Markdown")
+    await message.answer(t("help"), parse_mode="Markdown")
+

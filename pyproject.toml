@@ -21,4 +21,5 @@ motivation-bot = "motivation_bot.bot:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-motivation_bot = ["data/*.json"]
+motivation_bot = ["data/*.json", "data/locales/*.json"]
+
